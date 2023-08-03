@@ -1,0 +1,634 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(abind) # for array binding
+library(tidyr) # for data manipulation
+library(keras) # for building neural network
+library(dplyr)
+library(caret)
+```
+
+## Model 2 - Multi- Class Classification 
+
+```{r}
+# set the directory path where .dat files are saved
+setwd("/Users/kat/Documents/SeattleU/Spring 23/Written Homework-3/spectrograms1")
+
+# list all .dat files in the directory
+dat_files <- list.files(pattern = "\\.dat$")
+
+# initialize empty lists to store data and labels
+species_length <- c()
+x_data <- list()
+y_data <- list()
+
+# Load the data and labels from .dat files
+for (i in 1:length(dat_files)) {
+  # Load the data
+  dat <- load(dat_files[i])
+  x_data[[i]] <- species
+  
+  # Add label to y_data list
+  label <- gsub(".dat", "", dat_files[i])
+  y_data[[i]] <- label
+  species_length[i] = dim(species)[1]
+}
+```
+
+```{r}
+length(y_data)
+length(x_data)
+length(dat)
+```
+
+```{r}
+x_data <- abind(x_data, along = 1)
+dim(x_data)
+
+```
+
+```{r}
+#y_data <- c(rep(1,species_length[1]), rep(2,species_length[2]),rep(3,species_length[3]), rep(4,species_length[4]),rep(5,species_length[5]), rep(6,species_length[6]),rep(7,species_length[7]), rep(8,species_length[8]),rep(9,species_length[9]), rep(10,species_length[10]))
+
+y_data <- c(rep(0,species_length[1]), rep(1,species_length[2]),rep(2,species_length[3]), rep(3,species_length[4]),rep(4,species_length[5]), rep(5,species_length[6]),rep(6,species_length[7]), rep(7,species_length[8]),rep(8,species_length[9]),rep(9,species_length[10]),rep(10,species_length[11]),rep(11,species_length[12]))
+
+length(y_data)
+```
+
+```{r}
+y_data <- to_categorical(y_data)
+dim(y_data)
+```
+
+```{r}
+# Split data into training and validation sets
+set.seed(123)
+split <- sample(1:dim(x_data)[1], dim(x_data)[1]*0.7)
+#print(split)
+x_train <- x_data[split,,]
+dim(x_train)
+y_train <- y_data[split,]
+y_train <- matrix(y_train, ncol = 12)
+dim(y_train)
+x_val <- x_data[-split,,]
+dim(x_val)
+y_val <- y_data[-split,]
+y_val <- matrix(y_val, ncol = 12)
+dim(y_val)
+```
+
+```{r}
+x_train <- array_reshape(x_train, dim = c(dim(x_train)[1], 343, 256, 1))
+dim(x_train)
+x_val <- array_reshape(x_val, dim = c(dim(x_val)[1], 343, 256, 1))
+dim(x_val)
+```
+
+### 1
+
+```{r}
+modnn <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.25)%>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.1)%>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  #layer_dropout(rate=0.2)%>%
+  #layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 12, activation = "softmax")
+
+modnn %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 15,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+plot(history,smooth = FALSE)
+```
+
+```{r}
+scores <- modnn %>% evaluate(x_val, y_val, verbose = 0)
+print(paste("model accuracy for test data :",(round(scores,4)*100),"%"))
+```
+
+### 2
+
+```{r}
+modnn1 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.25)%>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.1)%>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dropout(rate=0.2)%>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 12, activation = "softmax")
+
+modnn1 %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn1 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 15,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+
+```
+
+```{r}
+plot(history,smooth = FALSE)
+scores <- modnn1 %>% evaluate(x_val, y_val, verbose = 0)
+print(paste("model accuracy for test data :",(round(scores,4)*100),"%"))
+```
+
+### 3
+
+```{r}
+modnn2 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.25)%>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.1)%>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  layer_dropout(rate=0.2)%>%
+  layer_dense(units = 256, activation = "relu") %>%
+  layer_dense(units = 12, activation = "softmax")
+
+modnn2 %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn2 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 30,
+  batch_size = 15,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+plot(history)
+```
+
+```{r}
+plot(history,smooth = FALSE)
+scores <- modnn2 %>% evaluate(x_val, y_val, verbose = 0)
+print(paste("model accuracy for test data :",(round(scores,4)*100),"%"))
+```
+
+### 4
+
+```{r}
+modnn4 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.25)%>%
+  layer_conv_2d(filters = 256, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.1)%>%
+  layer_flatten() %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dropout(rate=0.5)%>%
+  layer_dense(units = 12, activation = "softmax")
+
+modnn4 %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn4 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 50,
+  batch_size = 15,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+
+```
+
+```{r}
+plot(history,smooth = FALSE)
+scores <- modnn4 %>% evaluate(x_val, y_val, verbose = 0)
+print(paste("model accuracy for test data :",(round(scores,4)*100),"%"))
+```
+
+### 5
+
+```{r}
+modnn5 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.25)%>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate=0.3)%>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dropout(rate=0.5)%>%
+  layer_dense(units = 12, activation = "softmax")
+
+modnn5 %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn5 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 50,
+  batch_size = 15,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+plot(history)
+```
+
+```{r}
+# predict class probabilities for validation set
+pred_probs <- predict(modnn2, x_val, batch_size = 32)
+
+# convert class probabilities to predicted class labels
+predicted <- max.col(pred_probs) - 1
+
+# convert one-hot encoded labels to actual class labels
+actual <- max.col(y_val) - 1
+
+# generate confusion matrix
+conf_mat <- confusionMatrix(factor(predicted), factor(actual))
+
+ggplot(data = as.data.frame(conf_mat$table),
+       aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  scale_x_discrete(labels=c("American Crow","Barn Swallow","Black-capped Chickadee","Blue Jay","Dark-eyed Junco","House Finch","Mallard","Northern Flicker","Red-winged Blackbird","Stellers Jay","Western Meadowlark","White-crowned Sparrow")) +
+  scale_y_discrete(labels=c("American Crow","Barn Swallow","Black-capped Chickadee","Blue Jay","Dark-eyed Junco","House Finch","Mallard","Northern Flicker","Red-winged Blackbird","Stellers Jay","Western Meadowlark","White-crowned Sparrow")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+plot(history,smooth = FALSE)
+scores <- modnn4 %>% evaluate(x_val, y_val, verbose = 0)
+print(paste("model accuracy for test data :",(round(scores,4)*100),"%"))
+```
+
+
+# Binary - class Model
+
+```{r}
+# set the directory path where .dat files are saved
+setwd("/Users/kat/Documents/SeattleU/Spring 23/Written Homework-3/spectrograms/sp1")
+
+# list all .dat files in the directory
+dat_files <- list.files(pattern = "\\.dat$")
+
+
+# initialize empty lists to store data and labels
+species_length <- c()
+x_data <- list()
+y_data <- list()
+
+for (i in 1:length(dat_files)) {
+  # Load the data
+  dat <- load(dat_files[i])
+  x_data[[i]] <- species
+  
+  # Add label to y_data list
+  label <- gsub(".dat", "", dat_files[i])
+  y_data[[i]] <- label
+  species_length[i] = dim(species)[1]
+}
+
+length(y_data)
+length(x_data)
+```
+
+```{r}
+x_data <- abind(x_data, along = 1)
+dim(x_data)
+
+```
+
+```{r}
+y_data <- c(rep(0,species_length[1]), rep(1,species_length[2]))
+
+length(y_data)
+```
+
+```{r}
+#y_data <- to_categorical(y_data)
+y_data <- array(y_data, dim = c(length(y_data), 1))
+dim(y_data)
+```
+
+```{r}
+# Split data into training and validation sets
+set.seed(123)
+split <- sample(1:dim(x_data)[1], dim(x_data)[1]*0.7)
+#print(split)
+x_train <- x_data[split,,]
+dim(x_train)
+y_train <- y_data[split,]
+y_train <- matrix(y_train, ncol = 1)
+dim(y_train)
+x_val <- x_data[-split,,]
+dim(x_val)
+y_val <- y_data[-split,]
+y_val <- matrix(y_val, ncol = 1)
+dim(y_val)
+```
+
+```{r}
+x_train <- array_reshape(x_train, dim = c(dim(x_train)[1], 343, 256, 1))
+dim(x_train)
+x_val <- array_reshape(x_val, dim = c(dim(x_val)[1], 343, 256, 1))
+dim(x_val)
+```
+
+
+### 1
+
+```{r}
+modnn <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+modnn %>% compile(loss = "binary_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 32,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+```
+
+```{r}
+# predict class probabilities for validation set
+pred_probs <- predict(modnn, x_val)
+
+# convert class probabilities to predicted class labels
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+# generate confusion matrix
+library(caret)
+conf_mat <- confusionMatrix(factor(pred_labels), factor(y_val))
+
+# print confusion matrix
+conf_mat$table
+ggplot(data = as.data.frame(conf_mat$table),
+       aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  scale_x_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  scale_y_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+### 2
+
+```{r}
+modnn2 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+modnn2 %>% compile(loss = "binary_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn2 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 32,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+```
+
+```{r}
+# predict class probabilities for validation set
+pred_probs <- predict(modnn2, x_val)
+
+# convert class probabilities to predicted class labels
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+# generate confusion matrix
+library(caret)
+conf_mat <- confusionMatrix(factor(pred_labels), factor(y_val))
+
+# print confusion matrix
+conf_mat$table
+ggplot(data = as.data.frame(conf_mat$table),
+       aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  scale_x_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  scale_y_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+```{r}
+plot(history)
+```
+
+
+### 3
+
+```{r}
+modnn3 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  ayer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dropout(rate=0.4)
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+modnn3 %>% compile(loss = "binary_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn3 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 32,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+```
+
+```{r}
+# predict class probabilities for validation set
+pred_probs <- predict(modnn3, x_val)
+
+# convert class probabilities to predicted class labels
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+# generate confusion matrix
+library(caret)
+conf_mat <- confusionMatrix(factor(pred_labels), factor(y_val))
+
+# print confusion matrix
+conf_mat$table
+ggplot(data = as.data.frame(conf_mat$table),
+       aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  scale_x_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  scale_y_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### 4
+
+```{r}
+modnn4 <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu", input_shape = c(343, 256, 1)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  ayer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dropout(rate=0.4)%>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+modnn4 %>% compile(loss = "binary_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+```{r}
+# Train the model
+system.time(
+history <- modnn4 %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 25,
+  batch_size = 32,
+  validation_data = list(x_val, y_val),
+  verbose=0
+))
+```
+
+```{r}
+# predict class probabilities for validation set
+pred_probs <- predict(modnn4, x_val)
+
+# convert class probabilities to predicted class labels
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+# generate confusion matrix
+library(caret)
+conf_mat <- confusionMatrix(factor(pred_labels), factor(y_val))
+
+# print confusion matrix
+conf_mat$table
+ggplot(data = as.data.frame(conf_mat$table),
+       aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  scale_x_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  scale_y_discrete(labels=c("American Crow","White-crowned Sparrow")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
