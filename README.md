@@ -1,0 +1,2 @@
+# Identifying-the-Bird-Species-by-their-Call-Using-Convolutional-Neural-Network
+Convolutional neural networks and a deep learning technique are used in this project to identify different bird species based on their calls. The Xeno-Canto website, which collects animal sounds from all around the world, is where the bird cries were collected from. 600 audio recordings of 12 different bird species were chosen for this study.
